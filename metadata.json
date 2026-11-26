@@ -1,0 +1,6 @@
+{
+  "name": "Golden Corral Clean Radio",
+  "description": "Family-friendly royalty-free restaurant radio streaming, offline playback, peak dining scheduling, staff & inventory operations, clean track submissions, and compliance reporting.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

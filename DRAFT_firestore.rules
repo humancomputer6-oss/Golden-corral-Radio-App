@@ -1,0 +1,444 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global Safety Net (Default Deny)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Primitive Helpers ---
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function isBootstrapAdmin() {
+      return isVerified() && request.auth.token.email == 'latenightradiorap@gmail.com';
+    }
+
+    function hasUserDoc() {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function userRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    function isAdmin() {
+      return isBootstrapAdmin() || (isVerified() && hasUserDoc() && userRole() == 'admin');
+    }
+
+    function isManagerOrAdmin() {
+      return isAdmin() || (isVerified() && hasUserDoc() && userRole() == 'manager');
+    }
+
+    function isStaffOrAbove() {
+      return isManagerOrAdmin() || (isVerified() && hasUserDoc() && userRole() == 'staff');
+    }
+
+    // --- Validation Blueprints ---
+    function isValidUserProfile(data) {
+      return data.keys().hasAll(['uid', 'email', 'displayName', 'role', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'email', 'displayName', 'role', 'createdAt', 'updatedAt'])
+        && isValidId(data.uid)
+        && data.email is string && data.email.size() >= 3 && data.email.size() <= 256
+        && data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 100
+        && data.role in ['admin', 'manager', 'staff', 'subscriber']
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidAudioZone(data) {
+      return data.keys().hasAll(['id', 'name', 'volume', 'muted', 'activePlaylistId', 'updatedBy', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'name', 'volume', 'muted', 'activePlaylistId', 'updatedBy', 'updatedAt'])
+        && isValidId(data.id)
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 80
+        && data.volume is number && data.volume >= 0 && data.volume <= 100
+        && data.muted is bool
+        && isValidId(data.activePlaylistId)
+        && isValidId(data.updatedBy)
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidPlaylistSchedule(data) {
+      return data.keys().hasAll(['id', 'name', 'playlistId', 'daypart', 'startTime', 'endTime', 'days', 'enabled', 'updatedBy', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'name', 'playlistId', 'daypart', 'startTime', 'endTime', 'days', 'enabled', 'updatedBy', 'updatedAt'])
+        && isValidId(data.id)
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 100
+        && isValidId(data.playlistId)
+        && data.daypart is string && data.daypart.size() >= 1 && data.daypart.size() <= 60
+        && data.startTime is string && data.startTime.size() == 5 && data.startTime.matches('^\\d{2}:\\d{2}$')
+        && data.endTime is string && data.endTime.size() == 5 && data.endTime.matches('^\\d{2}:\\d{2}$')
+        && data.days is list && data.days.size() >= 1 && data.days.size() <= 7 && data.days[0] is string
+        && data.enabled is bool
+        && isValidId(data.updatedBy)
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidStaffShift(data) {
+      return data.keys().hasAll(['id', 'employeeName', 'role', 'zone', 'shiftDate', 'startTime', 'endTime', 'status', 'createdBy', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'employeeName', 'role', 'zone', 'shiftDate', 'startTime', 'endTime', 'status', 'notes', 'createdBy', 'createdAt', 'updatedAt'])
+        && isValidId(data.id)
+        && data.employeeName is string && data.employeeName.size() >= 1 && data.employeeName.size() <= 100
+        && data.role is string && data.role.size() >= 1 && data.role.size() <= 60
+        && data.zone is string && data.zone.size() >= 1 && data.zone.size() <= 60
+        && data.shiftDate is string && data.shiftDate.size() == 10 && data.shiftDate.matches('^\\d{4}-\\d{2}-\\d{2}$')
+        && data.startTime is string && data.startTime.size() == 5 && data.startTime.matches('^\\d{2}:\\d{2}$')
+        && data.endTime is string && data.endTime.size() == 5 && data.endTime.matches('^\\d{2}:\\d{2}$')
+        && data.status in ['scheduled', 'active', 'completed']
+        && (!('notes' in data) || (data.notes is string && data.notes.size() <= 300))
+        && isValidId(data.createdBy)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidInventoryLog(data) {
+      return data.keys().hasAll(['id', 'itemName', 'category', 'quantity', 'parLevel', 'unit', 'status', 'loggedBy', 'loggedByName', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'itemName', 'category', 'quantity', 'parLevel', 'unit', 'status', 'loggedBy', 'loggedByName', 'createdAt', 'updatedAt'])
+        && isValidId(data.id)
+        && data.itemName is string && data.itemName.size() >= 1 && data.itemName.size() <= 100
+        && data.category is string && data.category.size() >= 1 && data.category.size() <= 50
+        && data.quantity is number && data.quantity >= 0 && data.quantity <= 100000
+        && data.parLevel is number && data.parLevel >= 0 && data.parLevel <= 100000
+        && data.unit is string && data.unit.size() >= 1 && data.unit.size() <= 24
+        && data.status in ['nominal', 'low', 'reorder']
+        && isValidId(data.loggedBy)
+        && data.loggedByName is string && data.loggedByName.size() >= 1 && data.loggedByName.size() <= 100
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidMusicSubmission(data) {
+      return data.keys().hasAll([
+          'id', 'submitterId', 'submitterName', 'submitterEmail', 'artistName',
+          'trackTitle', 'genre', 'submissionType', 'audioFormat', 'fileUrl',
+          'fileSizeBytes', 'durationSeconds', 'cleanEditCertified', 'status',
+          'confirmationEmailSent', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'id', 'submitterId', 'submitterName', 'submitterEmail', 'artistName',
+          'trackTitle', 'genre', 'submissionType', 'audioFormat', 'fileUrl',
+          'fileSizeBytes', 'durationSeconds', 'cleanEditCertified', 'status',
+          'reviewerNotes', 'confirmationEmailSent', 'confirmationEmailId', 'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.id)
+        && isValidId(data.submitterId)
+        && data.submitterName is string && data.submitterName.size() >= 1 && data.submitterName.size() <= 100
+        && data.submitterEmail is string && data.submitterEmail.size() >= 3 && data.submitterEmail.size() <= 256
+        && data.artistName is string && data.artistName.size() >= 1 && data.artistName.size() <= 100
+        && data.trackTitle is string && data.trackTitle.size() >= 1 && data.trackTitle.size() <= 120
+        && data.genre is string && data.genre.size() >= 1 && data.genre.size() <= 50
+        && data.submissionType in ['Original', 'Instrumental', 'Cover Clean Edit']
+        && data.audioFormat in ['MP3', 'WAV']
+        && data.fileUrl is string && data.fileUrl.size() >= 1 && data.fileUrl.size() <= 512
+        && data.fileSizeBytes is number && data.fileSizeBytes > 0 && data.fileSizeBytes <= 26214400
+        && data.durationSeconds is number && data.durationSeconds > 0 && data.durationSeconds <= 1800
+        && data.cleanEditCertified == true
+        && data.status in ['pending', 'in_review', 'approved', 'rejected']
+        && (!('reviewerNotes' in data) || (data.reviewerNotes is string && data.reviewerNotes.size() <= 500))
+        && data.confirmationEmailSent is bool
+        && (!('confirmationEmailId' in data) || (data.confirmationEmailId is string && data.confirmationEmailId.size() <= 128))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidApprovedTrack(data) {
+      return data.keys().hasAll(['id', 'submissionId', 'artistName', 'trackTitle', 'genre', 'audioFormat', 'fileUrl', 'durationSeconds', 'approvedAt'])
+        && data.keys().hasOnly(['id', 'submissionId', 'artistName', 'trackTitle', 'genre', 'audioFormat', 'fileUrl', 'durationSeconds', 'approvedAt'])
+        && isValidId(data.id)
+        && isValidId(data.submissionId)
+        && data.artistName is string && data.artistName.size() >= 1 && data.artistName.size() <= 100
+        && data.trackTitle is string && data.trackTitle.size() >= 1 && data.trackTitle.size() <= 120
+        && data.genre is string && data.genre.size() >= 1 && data.genre.size() <= 50
+        && data.audioFormat in ['MP3', 'WAV']
+        && data.fileUrl is string && data.fileUrl.size() >= 1 && data.fileUrl.size() <= 512
+        && data.durationSeconds is number && data.durationSeconds > 0 && data.durationSeconds <= 1800
+        && data.approvedAt is timestamp;
+    }
+
+    function isValidTrackFeedback(data) {
+      return data.keys().hasAll(['id', 'trackId', 'userId', 'authorName', 'rating', 'comment', 'createdAt'])
+        && data.keys().hasOnly(['id', 'trackId', 'userId', 'authorName', 'rating', 'comment', 'createdAt'])
+        && isValidId(data.id)
+        && isValidId(data.trackId)
+        && isValidId(data.userId)
+        && data.authorName is string && data.authorName.size() >= 1 && data.authorName.size() <= 80
+        && data.rating is number && data.rating >= 1 && data.rating <= 5
+        && data.comment is string && data.comment.size() >= 1 && data.comment.size() <= 400
+        && data.createdAt is timestamp;
+    }
+
+    function isValidNotification(data) {
+      return data.keys().hasAll(['id', 'userId', 'title', 'message', 'type', 'read', 'createdAt'])
+        && data.keys().hasOnly(['id', 'userId', 'title', 'message', 'type', 'read', 'relatedId', 'createdAt'])
+        && isValidId(data.id)
+        && isValidId(data.userId)
+        && data.title is string && data.title.size() >= 1 && data.title.size() <= 120
+        && data.message is string && data.message.size() >= 1 && data.message.size() <= 400
+        && data.type in ['submission_status', 'report_ready', 'system']
+        && data.read is bool
+        && (!('relatedId' in data) || isValidId(data.relatedId))
+        && data.createdAt is timestamp;
+    }
+
+    function isValidReportSchedule(data) {
+      return data.keys().hasAll(['id', 'name', 'reportScope', 'format', 'dayOfMonth', 'recipientEmail', 'enabled', 'createdBy', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'name', 'reportScope', 'format', 'dayOfMonth', 'recipientEmail', 'enabled', 'lastRunAt', 'createdBy', 'createdAt', 'updatedAt'])
+        && isValidId(data.id)
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 100
+        && data.reportScope in ['operations', 'inventory', 'submissions', 'executive']
+        && data.format in ['CSV', 'JSON']
+        && data.dayOfMonth is number && data.dayOfMonth >= 1 && data.dayOfMonth <= 28
+        && data.recipientEmail is string && data.recipientEmail.size() >= 3 && data.recipientEmail.size() <= 256
+        && data.enabled is bool
+        && (!('lastRunAt' in data) || (data.lastRunAt is string && data.lastRunAt.size() <= 64))
+        && isValidId(data.createdBy)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidReportActivityLog(data) {
+      return data.keys().hasAll(['id', 'actorUid', 'actorEmail', 'actorRole', 'action', 'reportScope', 'rowCount', 'privacyRedacted', 'emailDispatched', 'createdAt'])
+        && data.keys().hasOnly(['id', 'actorUid', 'actorEmail', 'actorRole', 'action', 'reportScope', 'dateRangeStart', 'dateRangeEnd', 'rowCount', 'privacyRedacted', 'emailDispatched', 'createdAt'])
+        && isValidId(data.id)
+        && isValidId(data.actorUid)
+        && data.actorEmail is string && data.actorEmail.size() >= 3 && data.actorEmail.size() <= 256
+        && data.actorRole in ['admin', 'manager', 'staff', 'subscriber']
+        && data.action in ['export_csv', 'export_json', 'scheduled_monthly_run', 'access_audit']
+        && data.reportScope is string && data.reportScope.size() >= 1 && data.reportScope.size() <= 40
+        && (!('dateRangeStart' in data) || (data.dateRangeStart is string && data.dateRangeStart.size() <= 32))
+        && (!('dateRangeEnd' in data) || (data.dateRangeEnd is string && data.dateRangeEnd.size() <= 32))
+        && data.rowCount is number && data.rowCount >= 0 && data.rowCount <= 1000000
+        && data.privacyRedacted is bool
+        && data.emailDispatched is bool
+        && data.createdAt is timestamp;
+    }
+
+    // --- Collection Rules ---
+
+    // 1. Users & RBAC (PII Strictly Isolated)
+    match /users/{userId} {
+      allow get: if isValidId(userId) && (isOwner(userId) || isAdmin());
+      allow list: if isAdmin() || (isVerified() && resource.data.uid == request.auth.uid);
+      allow create: if isVerified() && isValidId(userId) && isOwner(userId)
+        && isValidUserProfile(incoming())
+        && incoming().uid == request.auth.uid
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && (
+          (isBootstrapAdmin() && incoming().role == 'admin') ||
+          (!isBootstrapAdmin() && incoming().role == 'subscriber')
+        );
+      allow update: if isVerified() && isValidId(userId)
+        && isValidUserProfile(incoming())
+        && incoming().uid == existing().uid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['role', 'displayName', 'updatedAt'])) ||
+          (isOwner(userId) && incoming().role == existing().role && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'updatedAt']))
+        );
+      allow delete: if isAdmin() && isValidId(userId);
+    }
+
+    // 2. Audio Zones (Remote Volume & Playlist State)
+    match /audioZones/{zoneId} {
+      allow get: if isSignedIn() && isValidId(zoneId);
+      allow list: if isSignedIn() && resource.data.volume >= 0;
+      allow create: if isStaffOrAbove() && isValidId(zoneId)
+        && isValidAudioZone(incoming())
+        && incoming().id == zoneId
+        && incoming().updatedBy == request.auth.uid
+        && incoming().updatedAt == request.time;
+      allow update: if isStaffOrAbove() && isValidId(zoneId)
+        && isValidAudioZone(incoming())
+        && incoming().id == existing().id
+        && incoming().updatedBy == request.auth.uid
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['volume', 'muted', 'activePlaylistId', 'updatedBy', 'updatedAt']);
+      allow delete: if isAdmin() && isValidId(zoneId);
+    }
+
+    // 3. Peak Dining Playlist Schedules
+    match /playlistSchedules/{scheduleId} {
+      allow get: if isSignedIn() && isValidId(scheduleId);
+      allow list: if isSignedIn() && resource.data.enabled is bool;
+      allow create: if isManagerOrAdmin() && isValidId(scheduleId)
+        && isValidPlaylistSchedule(incoming())
+        && incoming().id == scheduleId
+        && incoming().updatedBy == request.auth.uid
+        && incoming().updatedAt == request.time;
+      allow update: if isManagerOrAdmin() && isValidId(scheduleId)
+        && isValidPlaylistSchedule(incoming())
+        && incoming().id == existing().id
+        && incoming().updatedBy == request.auth.uid
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'playlistId', 'daypart', 'startTime', 'endTime', 'days', 'enabled', 'updatedBy', 'updatedAt']);
+      allow delete: if isManagerOrAdmin() && isValidId(scheduleId);
+    }
+
+    // 4. Staff Shift Schedules
+    match /staffShifts/{shiftId} {
+      allow get: if isStaffOrAbove() && isValidId(shiftId);
+      allow list: if isStaffOrAbove() && resource.data.status in ['scheduled', 'active', 'completed'];
+      allow create: if isManagerOrAdmin() && isValidId(shiftId)
+        && isValidStaffShift(incoming())
+        && incoming().id == shiftId
+        && incoming().createdBy == request.auth.uid
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isStaffOrAbove() && isValidId(shiftId)
+        && isValidStaffShift(incoming())
+        && incoming().id == existing().id
+        && incoming().createdBy == existing().createdBy
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          (isManagerOrAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['employeeName', 'role', 'zone', 'shiftDate', 'startTime', 'endTime', 'status', 'notes', 'updatedAt'])) ||
+          (incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']))
+        );
+      allow delete: if isManagerOrAdmin() && isValidId(shiftId);
+    }
+
+    // 5. Inventory Logs
+    match /inventoryLogs/{logId} {
+      allow get: if isStaffOrAbove() && isValidId(logId);
+      allow list: if isStaffOrAbove() && resource.data.status in ['nominal', 'low', 'reorder'];
+      allow create: if isStaffOrAbove() && isValidId(logId)
+        && isValidInventoryLog(incoming())
+        && incoming().id == logId
+        && incoming().loggedBy == request.auth.uid
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isStaffOrAbove() && isValidId(logId)
+        && isValidInventoryLog(incoming())
+        && incoming().id == existing().id
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['quantity', 'parLevel', 'status', 'loggedBy', 'loggedByName', 'updatedAt']);
+      allow delete: if isManagerOrAdmin() && isValidId(logId);
+    }
+
+    // 6. Music Submissions (PII Isolated to Owner & Admins/Managers)
+    match /submissions/{submissionId} {
+      allow get: if isValidId(submissionId) && (isAdmin() || isManagerOrAdmin() || (isSignedIn() && existing().submitterId == request.auth.uid));
+      allow list: if isManagerOrAdmin() || (isVerified() && resource.data.submitterId == request.auth.uid);
+      allow create: if isVerified() && isValidId(submissionId)
+        && isValidMusicSubmission(incoming())
+        && incoming().id == submissionId
+        && incoming().submitterId == request.auth.uid
+        && incoming().status == 'pending'
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isVerified() && isValidId(submissionId)
+        && isValidMusicSubmission(incoming())
+        && incoming().id == existing().id
+        && incoming().submitterId == existing().submitterId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'reviewerNotes', 'updatedAt'])) ||
+          (isManagerOrAdmin() && existing().status in ['pending', 'in_review'] && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'reviewerNotes', 'updatedAt']))
+        );
+      allow delete: if isAdmin() && isValidId(submissionId);
+    }
+
+    // 7. Approved Local Tracks (Publicly Streamable, No PII)
+    match /approvedTracks/{trackId} {
+      allow get: if isSignedIn() && isValidId(trackId);
+      allow list: if isSignedIn() && resource.data.audioFormat in ['MP3', 'WAV'];
+      allow create: if isAdmin() && isValidId(trackId)
+        && isValidApprovedTrack(incoming())
+        && incoming().id == trackId
+        && incoming().approvedAt == request.time;
+      allow update: if isAdmin() && isValidId(trackId)
+        && isValidApprovedTrack(incoming())
+        && incoming().id == existing().id
+        && incoming().diff(existing()).affectedKeys().hasOnly(['artistName', 'trackTitle', 'genre']);
+      allow delete: if isAdmin() && isValidId(trackId);
+    }
+
+    // 8. Track Feedback
+    match /trackFeedback/{feedbackId} {
+      allow get: if isSignedIn() && isValidId(feedbackId);
+      allow list: if isSignedIn() && resource.data.rating >= 1;
+      allow create: if isVerified() && isValidId(feedbackId)
+        && isValidTrackFeedback(incoming())
+        && incoming().id == feedbackId
+        && incoming().userId == request.auth.uid
+        && incoming().createdAt == request.time;
+      allow update: if false;
+      allow delete: if isValidId(feedbackId) && (isAdmin() || (isSignedIn() && existing().userId == request.auth.uid));
+    }
+
+    // 9. Real-Time Notifications
+    match /notifications/{notificationId} {
+      allow get: if isValidId(notificationId) && (isAdmin() || (isSignedIn() && existing().userId == request.auth.uid));
+      allow list: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow create: if isVerified() && isValidId(notificationId)
+        && isValidNotification(incoming())
+        && incoming().id == notificationId
+        && incoming().createdAt == request.time
+        && (isAdmin() || isManagerOrAdmin() || incoming().userId == request.auth.uid);
+      allow update: if isVerified() && isValidId(notificationId)
+        && isValidNotification(incoming())
+        && incoming().id == existing().id
+        && incoming().userId == existing().userId
+        && incoming().createdAt == existing().createdAt
+        && (isAdmin() || (isOwner(existing().userId) && incoming().diff(existing()).affectedKeys().hasOnly(['read'])));
+      allow delete: if isValidId(notificationId) && (isAdmin() || (isSignedIn() && existing().userId == request.auth.uid));
+    }
+
+    // 10. Monthly Report Schedules
+    match /reportSchedules/{scheduleId} {
+      allow get: if isManagerOrAdmin() && isValidId(scheduleId);
+      allow list: if isManagerOrAdmin() && resource.data.enabled is bool;
+      allow create: if isManagerOrAdmin() && isValidId(scheduleId)
+        && isValidReportSchedule(incoming())
+        && incoming().id == scheduleId
+        && incoming().createdBy == request.auth.uid
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isManagerOrAdmin() && isValidId(scheduleId)
+        && isValidReportSchedule(incoming())
+        && incoming().id == existing().id
+        && incoming().createdBy == existing().createdBy
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'reportScope', 'format', 'dayOfMonth', 'recipientEmail', 'enabled', 'lastRunAt', 'updatedAt']);
+      allow delete: if isAdmin() && isValidId(scheduleId);
+    }
+
+    // 11. Report Activity & Access Audit Logs (Immutable)
+    match /reportActivityLogs/{logId} {
+      allow get: if isManagerOrAdmin() && isValidId(logId);
+      allow list: if isManagerOrAdmin() && resource.data.rowCount >= 0;
+      allow create: if isManagerOrAdmin() && isValidId(logId)
+        && isValidReportActivityLog(incoming())
+        && incoming().id == logId
+        && incoming().actorUid == request.auth.uid
+        && incoming().createdAt == request.time;
+      allow update: if false;
+      allow delete: if false;
+    }
+  }
+}

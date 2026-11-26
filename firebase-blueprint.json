@@ -1,0 +1,250 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Authenticated user account and RBAC role assignment.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "email": { "type": "string", "format": "email", "maxLength": 256 },
+        "displayName": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "role": { "type": "string", "enum": ["admin", "manager", "staff", "subscriber"], "maxLength": 20 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "displayName", "role", "createdAt", "updatedAt"]
+    },
+    "AudioZone": {
+      "title": "Audio Zone",
+      "description": "Restaurant zone remote volume and mute configuration.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 64, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "volume": { "type": "number" },
+        "muted": { "type": "boolean" },
+        "activePlaylistId": { "type": "string", "maxLength": 64 },
+        "updatedBy": { "type": "string", "maxLength": 128 },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "volume", "muted", "activePlaylistId", "updatedBy", "updatedAt"]
+    },
+    "PlaylistSchedule": {
+      "title": "Playlist Schedule",
+      "description": "Scheduled playlist block for peak dining or kitchen hours.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 64, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "playlistId": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "daypart": { "type": "string", "maxLength": 60 },
+        "startTime": { "type": "string", "pattern": "^\\d{2}:\\d{2}$", "maxLength": 5 },
+        "endTime": { "type": "string", "pattern": "^\\d{2}:\\d{2}$", "maxLength": 5 },
+        "days": { "type": "array" },
+        "enabled": { "type": "boolean" },
+        "updatedBy": { "type": "string", "maxLength": 128 },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "playlistId", "daypart", "startTime", "endTime", "days", "enabled", "updatedBy", "updatedAt"]
+    },
+    "StaffShift": {
+      "title": "Staff Shift",
+      "description": "Restaurant staff shift schedule record.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 64, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "employeeName": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "role": { "type": "string", "minLength": 1, "maxLength": 60 },
+        "zone": { "type": "string", "minLength": 1, "maxLength": 60 },
+        "shiftDate": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$", "maxLength": 10 },
+        "startTime": { "type": "string", "pattern": "^\\d{2}:\\d{2}$", "maxLength": 5 },
+        "endTime": { "type": "string", "pattern": "^\\d{2}:\\d{2}$", "maxLength": 5 },
+        "status": { "type": "string", "enum": ["scheduled", "active", "completed"], "maxLength": 20 },
+        "notes": { "type": "string", "maxLength": 300 },
+        "createdBy": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "employeeName", "role", "zone", "shiftDate", "startTime", "endTime", "status", "createdBy", "createdAt", "updatedAt"]
+    },
+    "InventoryLog": {
+      "title": "Inventory Log",
+      "description": "Kitchen and dining operations inventory stock log.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 64, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "itemName": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "category": { "type": "string", "minLength": 1, "maxLength": 50 },
+        "quantity": { "type": "number" },
+        "parLevel": { "type": "number" },
+        "unit": { "type": "string", "minLength": 1, "maxLength": 24 },
+        "status": { "type": "string", "enum": ["nominal", "low", "reorder"], "maxLength": 20 },
+        "loggedBy": { "type": "string", "maxLength": 128 },
+        "loggedByName": { "type": "string", "maxLength": 100 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "itemName", "category", "quantity", "parLevel", "unit", "status", "loggedBy", "loggedByName", "createdAt", "updatedAt"]
+    },
+    "MusicSubmission": {
+      "title": "Music Submission",
+      "description": "Clean Radio Edit music submission uploaded by an artist or listener.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 64, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "submitterId": { "type": "string", "maxLength": 128 },
+        "submitterName": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "submitterEmail": { "type": "string", "format": "email", "maxLength": 256 },
+        "artistName": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "trackTitle": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "genre": { "type": "string", "minLength": 1, "maxLength": 50 },
+        "submissionType": { "type": "string", "enum": ["Original", "Instrumental", "Cover Clean Edit"], "maxLength": 32 },
+        "audioFormat": { "type": "string", "enum": ["MP3", "WAV"], "maxLength": 8 },
+        "fileUrl": { "type": "string", "minLength": 1, "maxLength": 512 },
+        "fileSizeBytes": { "type": "number" },
+        "durationSeconds": { "type": "number" },
+        "cleanEditCertified": { "type": "boolean" },
+        "status": { "type": "string", "enum": ["pending", "in_review", "approved", "rejected"], "maxLength": 20 },
+        "reviewerNotes": { "type": "string", "maxLength": 500 },
+        "confirmationEmailSent": { "type": "boolean" },
+        "confirmationEmailId": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "submitterId", "submitterName", "submitterEmail", "artistName", "trackTitle", "genre", "submissionType", "audioFormat", "fileUrl", "fileSizeBytes", "durationSeconds", "cleanEditCertified", "status", "confirmationEmailSent", "createdAt", "updatedAt"]
+    },
+    "ApprovedTrack": {
+      "title": "Approved Local Track",
+      "description": "Publicly streamable approved clean radio edit track without submitter PII.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 64, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "submissionId": { "type": "string", "maxLength": 64 },
+        "artistName": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "trackTitle": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "genre": { "type": "string", "minLength": 1, "maxLength": 50 },
+        "audioFormat": { "type": "string", "enum": ["MP3", "WAV"], "maxLength": 8 },
+        "fileUrl": { "type": "string", "minLength": 1, "maxLength": 512 },
+        "durationSeconds": { "type": "number" },
+        "approvedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "submissionId", "artistName", "trackTitle", "genre", "audioFormat", "fileUrl", "durationSeconds", "approvedAt"]
+    },
+    "TrackFeedback": {
+      "title": "Track Feedback",
+      "description": "Listener ratings and feedback for radio tracks.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 64, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "trackId": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "authorName": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "rating": { "type": "number" },
+        "comment": { "type": "string", "minLength": 1, "maxLength": 400 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "trackId", "userId", "authorName", "rating", "comment", "createdAt"]
+    },
+    "UserNotification": {
+      "title": "User Notification",
+      "description": "Real-time notifications for submission status updates and generated reports.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 64, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "userId": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "message": { "type": "string", "minLength": 1, "maxLength": 400 },
+        "type": { "type": "string", "enum": ["submission_status", "report_ready", "system"], "maxLength": 32 },
+        "read": { "type": "boolean" },
+        "relatedId": { "type": "string", "maxLength": 64 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "title", "message", "type", "read", "createdAt"]
+    },
+    "ReportSchedule": {
+      "title": "Monthly Report Schedule",
+      "description": "Automated recurring monthly report generation schedule.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 64, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "reportScope": { "type": "string", "enum": ["operations", "inventory", "submissions", "executive"], "maxLength": 32 },
+        "format": { "type": "string", "enum": ["CSV", "JSON"], "maxLength": 8 },
+        "dayOfMonth": { "type": "number" },
+        "recipientEmail": { "type": "string", "format": "email", "maxLength": 256 },
+        "enabled": { "type": "boolean" },
+        "lastRunAt": { "type": "string", "maxLength": 64 },
+        "createdBy": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "reportScope", "format", "dayOfMonth", "recipientEmail", "enabled", "createdBy", "createdAt", "updatedAt"]
+    },
+    "ReportActivityLog": {
+      "title": "Report Activity Log",
+      "description": "Immutable audit history of exported and scheduled reports and access events.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 64, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "actorUid": { "type": "string", "maxLength": 128 },
+        "actorEmail": { "type": "string", "maxLength": 256 },
+        "actorRole": { "type": "string", "maxLength": 20 },
+        "action": { "type": "string", "enum": ["export_csv", "export_json", "scheduled_monthly_run", "access_audit"], "maxLength": 32 },
+        "reportScope": { "type": "string", "maxLength": 40 },
+        "dateRangeStart": { "type": "string", "maxLength": 32 },
+        "dateRangeEnd": { "type": "string", "maxLength": 32 },
+        "rowCount": { "type": "number" },
+        "privacyRedacted": { "type": "boolean" },
+        "emailDispatched": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "actorUid", "actorEmail", "actorRole", "action", "reportScope", "rowCount", "privacyRedacted", "emailDispatched", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "User profiles and RBAC roles isolated per user or admin."
+    },
+    "/audioZones/{zoneId}": {
+      "schema": { "$ref": "#/entities/AudioZone" },
+      "description": "Live dining and kitchen audio zone volume states."
+    },
+    "/playlistSchedules/{scheduleId}": {
+      "schema": { "$ref": "#/entities/PlaylistSchedule" },
+      "description": "Peak dining and kitchen playlist schedule blocks."
+    },
+    "/staffShifts/{shiftId}": {
+      "schema": { "$ref": "#/entities/StaffShift" },
+      "description": "Staff shift schedules for restaurant operations."
+    },
+    "/inventoryLogs/{logId}": {
+      "schema": { "$ref": "#/entities/InventoryLog" },
+      "description": "Inventory logs for kitchen and dining floor items."
+    },
+    "/submissions/{submissionId}": {
+      "schema": { "$ref": "#/entities/MusicSubmission" },
+      "description": "Incoming music submissions with PII isolated to owner and admins."
+    },
+    "/approvedTracks/{trackId}": {
+      "schema": { "$ref": "#/entities/ApprovedTrack" },
+      "description": "Approved Clean Radio Edit tracks available for on-air streaming."
+    },
+    "/trackFeedback/{feedbackId}": {
+      "schema": { "$ref": "#/entities/TrackFeedback" },
+      "description": "Listener ratings and comments on radio tracks."
+    },
+    "/notifications/{notificationId}": {
+      "schema": { "$ref": "#/entities/UserNotification" },
+      "description": "Real-time notifications for status changes and report generation."
+    },
+    "/reportSchedules/{scheduleId}": {
+      "schema": { "$ref": "#/entities/ReportSchedule" },
+      "description": "Automated recurring monthly report configurations."
+    },
+    "/reportActivityLogs/{logId}": {
+      "schema": { "$ref": "#/entities/ReportActivityLog" },
+      "description": "Immutable report activity and access audit logs."
+    }
+  }
+}
