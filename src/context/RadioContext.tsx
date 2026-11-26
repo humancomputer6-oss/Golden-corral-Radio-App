@@ -65,6 +65,8 @@ interface RadioContextValue {
   profile: UserProfile | null;
   authReady: boolean;
   signingIn: boolean;
+  authError: string | null;
+  clearAuthError: () => void;
   signIn: () => Promise<void>;
   logOut: () => Promise<void>;
   allUsers: UserProfile[];
@@ -146,6 +148,7 @@ export const RadioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const [signingIn, setSigningIn] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
   const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
 
   const [audioZones, setAudioZones] = useState<AudioZone[]>(DEFAULT_AUDIO_ZONES);
@@ -671,10 +674,24 @@ export const RadioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
   }, [authReady, user, profile]);
 
+  const clearAuthError = useCallback(() => setAuthError(null), []);
+
   const signIn = useCallback(async () => {
     setSigningIn(true);
+    setAuthError(null);
     try {
       await signInWithPopup(auth, googleProvider);
+    } catch (err) {
+      const code = (err as { code?: string })?.code || '';
+      if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
+        setAuthError('Sign-in was canceled before completion. Tap Sign In whenever you are ready.');
+      } else if (code === 'auth/popup-blocked') {
+        setAuthError('Browser popup was blocked. Please allow popups for this site and try again.');
+      } else if (code === 'auth/unauthorized-domain') {
+        setAuthError('This domain is not authorized in Firebase Authentication settings.');
+      } else {
+        setAuthError(err instanceof Error ? err.message : 'Unable to sign in right now.');
+      }
     } finally {
       setSigningIn(false);
     }
@@ -1012,6 +1029,8 @@ export const RadioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     profile,
     authReady,
     signingIn,
+    authError,
+    clearAuthError,
     signIn,
     logOut,
     allUsers,

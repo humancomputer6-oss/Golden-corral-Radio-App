@@ -37,6 +37,8 @@ const AppShell: React.FC = () => {
     user,
     profile,
     signingIn,
+    authError,
+    clearAuthError,
     signIn,
     logOut,
     notifications,
@@ -127,6 +129,23 @@ const AppShell: React.FC = () => {
           </p>
           <PWAInstallButton />
         </div>
+
+        {authError && (
+          <div
+            role="alert"
+            className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-xs text-amber-950 flex items-center justify-between gap-3"
+          >
+            <span>{authError}</span>
+            <button
+              type="button"
+              onClick={clearAuthError}
+              aria-label="Dismiss sign-in notice"
+              className="min-h-[36px] min-w-[36px] flex items-center justify-center rounded-lg text-amber-900 hover:bg-amber-100 shrink-0"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
 
         {activeTab === 'listen' && <ListenView />}
         {activeTab === 'zones' && <ZonesScheduleView />}
